@@ -115,6 +115,7 @@
 		&:hover:not(:disabled) {
 			color: var(--wp-admin-theme-color-darker-10);
 			box-shadow: inset 0 0 0 $border-width var(--wp-admin-theme-color-darker-10);
+			text-decoration: none;
 		}
 
 		&:disabled,
@@ -149,6 +150,7 @@
 		color: var(--wp-admin-theme-color);
 		background: transparent;
 		padding: 6px; // This reduces the horizontal padding on tertiary/text buttons, so as to space them optically.
+		text-decoration: underline;
 
 		.dashicon {
 			display: inline-block;
