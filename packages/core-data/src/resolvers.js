@@ -63,7 +63,7 @@ export function* getEntityRecord( kind, name, key = '', query ) {
 	if ( ! entity ) {
 		return;
 	}
-	const lock = yield acquireStoreLock(
+	const lock = yield* acquireStoreLock(
 		'core',
 		[ 'entities', 'data', kind, name, key ],
 		{ exclusive: false }
@@ -115,7 +115,7 @@ export function* getEntityRecord( kind, name, key = '', query ) {
 		const record = yield apiFetch( { path } );
 		yield receiveEntityRecords( kind, name, record, query );
 	} finally {
-		yield releaseStoreLock( lock );
+		yield* releaseStoreLock( lock );
 	}
 }
 
@@ -148,7 +148,7 @@ export function* getEntityRecords( kind, name, query = {} ) {
 	if ( ! entity ) {
 		return;
 	}
-	const lock = yield acquireStoreLock(
+	const lock = yield* acquireStoreLock(
 		'core',
 		[ 'entities', 'data', kind, name ],
 		{ exclusive: false }
@@ -189,9 +189,8 @@ export function* getEntityRecords( kind, name, query = {} ) {
 		}
 
 		yield receiveEntityRecords( kind, name, records, query );
-		yield releaseStoreLock( lock );
 	} finally {
-		yield releaseStoreLock( lock );
+		yield* releaseStoreLock( lock );
 	}
 }
 

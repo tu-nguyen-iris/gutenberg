@@ -160,56 +160,51 @@ export function* deleteEntityRecord( kind, name, recordId, query ) {
 	if ( ! entity ) {
 		return;
 	}
-	const lock = yield acquireStoreLock(
+	const lock = yield* acquireStoreLock(
 		'core',
 		[ 'entities', 'data', kind, name, recordId ],
 		{ exclusive: true }
 	);
 	try {
-		yield* doDeleteEntityRecord( entity, recordId, query );
-	} finally {
-		yield releaseStoreLock( lock );
-	}
-}
+		let error;
+		let deletedRecord = false;
 
-function* doDeleteEntityRecord( entity, recordId, query ) {
-	const { kind, name } = entity;
-	let error;
-	let deletedRecord = false;
+		yield {
+			type: 'DELETE_ENTITY_RECORD_START',
+			kind,
+			name,
+			recordId,
+		};
 
-	yield {
-		type: 'DELETE_ENTITY_RECORD_START',
-		kind,
-		name,
-		recordId,
-	};
+		try {
+			let path = `${ entity.baseURL }/${ recordId }`;
 
-	try {
-		let path = `${ entity.baseURL }/${ recordId }`;
+			if ( query ) {
+				path = addQueryArgs( path, query );
+			}
 
-		if ( query ) {
-			path = addQueryArgs( path, query );
+			deletedRecord = yield apiFetch( {
+				path,
+				method: 'DELETE',
+			} );
+
+			yield removeItems( kind, name, recordId, true );
+		} catch ( _error ) {
+			error = _error;
 		}
 
-		deletedRecord = yield apiFetch( {
-			path,
-			method: 'DELETE',
-		} );
+		yield {
+			type: 'DELETE_ENTITY_RECORD_FINISH',
+			kind,
+			name,
+			recordId,
+			error,
+		};
 
-		yield removeItems( kind, name, recordId, true );
-	} catch ( _error ) {
-		error = _error;
+		return deletedRecord;
+	} finally {
+		yield* releaseStoreLock( lock );
 	}
-
-	yield {
-		type: 'DELETE_ENTITY_RECORD_FINISH',
-		kind,
-		name,
-		recordId,
-		error,
-	};
-
-	return deletedRecord;
 }
 
 /**
@@ -349,245 +344,256 @@ export function* saveEntityRecord(
 	const entityIdKey = entity.key || DEFAULT_ENTITY_KEY;
 	const recordId = record[ entityIdKey ];
 
-	const lock = yield acquireStoreLock(
+	const lock = yield* acquireStoreLock(
 		'core',
 		[ 'entities', 'data', kind, name, recordId || uuid() ],
 		{ exclusive: true }
 	);
 	try {
-		yield* doSaveEntityRecord( entity, record, recordId, { isAutosave } );
-	} finally {
-		yield releaseStoreLock( lock );
-	}
-}
-
-function* doSaveEntityRecord( entity, record, recordId, { isAutosave } ) {
-	const { kind, name } = entity;
-	// Evaluate optimized edits.
-	// (Function edits that should be evaluated on save to avoid expensive computations on every edit.)
-	for ( const [ key, value ] of Object.entries( record ) ) {
-		if ( typeof value === 'function' ) {
-			const evaluatedValue = value(
-				yield syncSelect(
-					'core',
-					'getEditedEntityRecord',
-					kind,
-					name,
-					recordId
-				)
-			);
-			yield editEntityRecord(
-				kind,
-				name,
-				recordId,
-				{
-					[ key ]: evaluatedValue,
-				},
-				{ undoIgnore: true }
-			);
-			record[ key ] = evaluatedValue;
-		}
-	}
-
-	yield {
-		type: 'SAVE_ENTITY_RECORD_START',
-		kind,
-		name,
-		recordId,
-		isAutosave,
-	};
-	let updatedRecord;
-	let error;
-	let persistedEntity;
-	let currentEdits;
-	try {
-		const path = `${ entity.baseURL }${ recordId ? '/' + recordId : '' }`;
-		const persistedRecord = yield syncSelect(
-			'core',
-			'getRawEntityRecord',
-			kind,
-			name,
-			recordId
-		);
-
-		if ( isAutosave ) {
-			// Most of this autosave logic is very specific to posts.
-			// This is fine for now as it is the only supported autosave,
-			// but ideally this should all be handled in the back end,
-			// so the client just sends and receives objects.
-			const currentUser = yield syncSelect( 'core', 'getCurrentUser' );
-			const currentUserId = currentUser ? currentUser.id : undefined;
-			const autosavePost = yield syncSelect(
-				'core',
-				'getAutosave',
-				persistedRecord.type,
-				persistedRecord.id,
-				currentUserId
-			);
-			// Autosaves need all expected fields to be present.
-			// So we fallback to the previous autosave and then
-			// to the actual persisted entity if the edits don't
-			// have a value.
-			let data = { ...persistedRecord, ...autosavePost, ...record };
-			data = Object.keys( data ).reduce(
-				( acc, key ) => {
-					if ( [ 'title', 'excerpt', 'content' ].includes( key ) ) {
-						// Edits should be the "raw" attribute values.
-						acc[ key ] = get( data[ key ], 'raw', data[ key ] );
-					}
-					return acc;
-				},
-				{
-					status:
-						data.status === 'auto-draft' ? 'draft' : data.status,
-				}
-			);
-			updatedRecord = yield apiFetch( {
-				path: `${ path }/autosaves`,
-				method: 'POST',
-				data,
-			} );
-			// An autosave may be processed by the server as a regular save
-			// when its update is requested by the author and the post had
-			// draft or auto-draft status.
-			if ( persistedRecord.id === updatedRecord.id ) {
-				let newRecord = {
-					...persistedRecord,
-					...data,
-					...updatedRecord,
-				};
-				newRecord = Object.keys( newRecord ).reduce( ( acc, key ) => {
-					// These properties are persisted in autosaves.
-					if ( [ 'title', 'excerpt', 'content' ].includes( key ) ) {
-						// Edits should be the "raw" attribute values.
-						acc[ key ] = get(
-							newRecord[ key ],
-							'raw',
-							newRecord[ key ]
-						);
-					} else if ( key === 'status' ) {
-						// Status is only persisted in autosaves when going from
-						// "auto-draft" to "draft".
-						acc[ key ] =
-							persistedRecord.status === 'auto-draft' &&
-							newRecord.status === 'draft'
-								? newRecord.status
-								: persistedRecord.status;
-					} else {
-						// These properties are not persisted in autosaves.
-						acc[ key ] = get(
-							persistedRecord[ key ],
-							'raw',
-							persistedRecord[ key ]
-						);
-					}
-					return acc;
-				}, {} );
-				yield receiveEntityRecords(
-					kind,
-					name,
-					newRecord,
-					undefined,
-					true
-				);
-			} else {
-				yield receiveAutosaves( persistedRecord.id, updatedRecord );
-			}
-		} else {
-			// Auto drafts should be converted to drafts on explicit saves and we should not respect their default title,
-			// but some plugins break with this behavior so we can't filter it on the server.
-			let data = record;
-			if (
-				kind === 'postType' &&
-				persistedRecord &&
-				persistedRecord.status === 'auto-draft'
-			) {
-				if ( ! data.status ) {
-					data = { ...data, status: 'draft' };
-				}
-				if ( ! data.title || data.title === 'Auto Draft' ) {
-					data = { ...data, title: '' };
-				}
-			}
-
-			// Get the full local version of the record before the update,
-			// to merge it with the edits and then propagate it to subscribers
-			persistedEntity = yield syncSelect(
-				'core',
-				'__experimentalGetEntityRecordNoResolver',
-				kind,
-				name,
-				recordId
-			);
-			currentEdits = yield syncSelect(
-				'core',
-				'getEntityRecordEdits',
-				kind,
-				name,
-				recordId
-			);
-			yield receiveEntityRecords(
-				kind,
-				name,
-				{ ...persistedEntity, ...data },
-				undefined,
-				true
-			);
-
-			updatedRecord = yield apiFetch( {
-				path,
-				method: recordId ? 'PUT' : 'POST',
-				data,
-			} );
-			yield receiveEntityRecords(
-				kind,
-				name,
-				updatedRecord,
-				undefined,
-				true
-			);
-		}
-	} catch ( _error ) {
-		error = _error;
-
-		// If we got to the point in the try block where we made an optimistic update,
-		// we need to roll it back here.
-		if ( persistedEntity && currentEdits ) {
-			yield receiveEntityRecords(
-				kind,
-				name,
-				persistedEntity,
-				undefined,
-				true
-			);
-			yield editEntityRecord(
-				kind,
-				name,
-				recordId,
-				{
-					...currentEdits,
-					...( yield syncSelect(
+		// Evaluate optimized edits.
+		// (Function edits that should be evaluated on save to avoid expensive computations on every edit.)
+		for ( const [ key, value ] of Object.entries( record ) ) {
+			if ( typeof value === 'function' ) {
+				const evaluatedValue = value(
+					yield syncSelect(
 						'core',
-						'getEntityRecordEdits',
+						'getEditedEntityRecord',
 						kind,
 						name,
 						recordId
-					) ),
-				},
-				{ undoIgnore: true }
-			);
+					)
+				);
+				yield editEntityRecord(
+					kind,
+					name,
+					recordId,
+					{
+						[ key ]: evaluatedValue,
+					},
+					{ undoIgnore: true }
+				);
+				record[ key ] = evaluatedValue;
+			}
 		}
-	}
-	yield {
-		type: 'SAVE_ENTITY_RECORD_FINISH',
-		kind,
-		name,
-		recordId,
-		error,
-		isAutosave,
-	};
 
-	return updatedRecord;
+		yield {
+			type: 'SAVE_ENTITY_RECORD_START',
+			kind,
+			name,
+			recordId,
+			isAutosave,
+		};
+		let updatedRecord;
+		let error;
+		let persistedEntity;
+		let currentEdits;
+		try {
+			const path = `${ entity.baseURL }${
+				recordId ? '/' + recordId : ''
+			}`;
+			const persistedRecord = yield syncSelect(
+				'core',
+				'getRawEntityRecord',
+				kind,
+				name,
+				recordId
+			);
+
+			if ( isAutosave ) {
+				// Most of this autosave logic is very specific to posts.
+				// This is fine for now as it is the only supported autosave,
+				// but ideally this should all be handled in the back end,
+				// so the client just sends and receives objects.
+				const currentUser = yield syncSelect(
+					'core',
+					'getCurrentUser'
+				);
+				const currentUserId = currentUser ? currentUser.id : undefined;
+				const autosavePost = yield syncSelect(
+					'core',
+					'getAutosave',
+					persistedRecord.type,
+					persistedRecord.id,
+					currentUserId
+				);
+				// Autosaves need all expected fields to be present.
+				// So we fallback to the previous autosave and then
+				// to the actual persisted entity if the edits don't
+				// have a value.
+				let data = { ...persistedRecord, ...autosavePost, ...record };
+				data = Object.keys( data ).reduce(
+					( acc, key ) => {
+						if (
+							[ 'title', 'excerpt', 'content' ].includes( key )
+						) {
+							// Edits should be the "raw" attribute values.
+							acc[ key ] = get( data[ key ], 'raw', data[ key ] );
+						}
+						return acc;
+					},
+					{
+						status:
+							data.status === 'auto-draft'
+								? 'draft'
+								: data.status,
+					}
+				);
+				updatedRecord = yield apiFetch( {
+					path: `${ path }/autosaves`,
+					method: 'POST',
+					data,
+				} );
+				// An autosave may be processed by the server as a regular save
+				// when its update is requested by the author and the post had
+				// draft or auto-draft status.
+				if ( persistedRecord.id === updatedRecord.id ) {
+					let newRecord = {
+						...persistedRecord,
+						...data,
+						...updatedRecord,
+					};
+					newRecord = Object.keys( newRecord ).reduce(
+						( acc, key ) => {
+							// These properties are persisted in autosaves.
+							if (
+								[ 'title', 'excerpt', 'content' ].includes(
+									key
+								)
+							) {
+								// Edits should be the "raw" attribute values.
+								acc[ key ] = get(
+									newRecord[ key ],
+									'raw',
+									newRecord[ key ]
+								);
+							} else if ( key === 'status' ) {
+								// Status is only persisted in autosaves when going from
+								// "auto-draft" to "draft".
+								acc[ key ] =
+									persistedRecord.status === 'auto-draft' &&
+									newRecord.status === 'draft'
+										? newRecord.status
+										: persistedRecord.status;
+							} else {
+								// These properties are not persisted in autosaves.
+								acc[ key ] = get(
+									persistedRecord[ key ],
+									'raw',
+									persistedRecord[ key ]
+								);
+							}
+							return acc;
+						},
+						{}
+					);
+					yield receiveEntityRecords(
+						kind,
+						name,
+						newRecord,
+						undefined,
+						true
+					);
+				} else {
+					yield receiveAutosaves( persistedRecord.id, updatedRecord );
+				}
+			} else {
+				// Auto drafts should be converted to drafts on explicit saves and we should not respect their default title,
+				// but some plugins break with this behavior so we can't filter it on the server.
+				let data = record;
+				if (
+					kind === 'postType' &&
+					persistedRecord &&
+					persistedRecord.status === 'auto-draft'
+				) {
+					if ( ! data.status ) {
+						data = { ...data, status: 'draft' };
+					}
+					if ( ! data.title || data.title === 'Auto Draft' ) {
+						data = { ...data, title: '' };
+					}
+				}
+
+				// Get the full local version of the record before the update,
+				// to merge it with the edits and then propagate it to subscribers
+				persistedEntity = yield syncSelect(
+					'core',
+					'__experimentalGetEntityRecordNoResolver',
+					kind,
+					name,
+					recordId
+				);
+				currentEdits = yield syncSelect(
+					'core',
+					'getEntityRecordEdits',
+					kind,
+					name,
+					recordId
+				);
+				yield receiveEntityRecords(
+					kind,
+					name,
+					{ ...persistedEntity, ...data },
+					undefined,
+					true
+				);
+
+				updatedRecord = yield apiFetch( {
+					path,
+					method: recordId ? 'PUT' : 'POST',
+					data,
+				} );
+				yield receiveEntityRecords(
+					kind,
+					name,
+					updatedRecord,
+					undefined,
+					true
+				);
+			}
+		} catch ( _error ) {
+			error = _error;
+
+			// If we got to the point in the try block where we made an optimistic update,
+			// we need to roll it back here.
+			if ( persistedEntity && currentEdits ) {
+				yield receiveEntityRecords(
+					kind,
+					name,
+					persistedEntity,
+					undefined,
+					true
+				);
+				yield editEntityRecord(
+					kind,
+					name,
+					recordId,
+					{
+						...currentEdits,
+						...( yield syncSelect(
+							'core',
+							'getEntityRecordEdits',
+							kind,
+							name,
+							recordId
+						) ),
+					},
+					{ undoIgnore: true }
+				);
+			}
+		}
+		yield {
+			type: 'SAVE_ENTITY_RECORD_FINISH',
+			kind,
+			name,
+			recordId,
+			error,
+			isAutosave,
+		};
+
+		return updatedRecord;
+	} finally {
+		yield* releaseStoreLock( lock );
+	}
 }
 
 /**

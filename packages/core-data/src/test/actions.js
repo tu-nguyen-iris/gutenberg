@@ -16,6 +16,19 @@ import {
 	receiveCurrentUser,
 } from '../actions';
 
+jest.mock( '../locks/actions', () => ( {
+	acquireStoreLock: jest.fn( () => [
+		{
+			type: 'MOCKED_ACQUIRE_LOCK',
+		},
+	] ),
+	releaseStoreLock: jest.fn( () => [
+		{
+			type: 'MOCKED_RELEASE_LOCK',
+		},
+	] ),
+} ) );
+
 describe( 'editEntityRecord', () => {
 	it( 'throws when the edited entity does not have a loaded config.', () => {
 		const entity = { kind: 'someKind', name: 'someName', id: 'someId' };
@@ -28,6 +41,7 @@ describe( 'editEntityRecord', () => {
 		expect( fulfillment.next().value ).toEqual(
 			syncSelect( 'core', 'getEntity', entity.kind, entity.name )
 		);
+
 		// Don't pass back an entity config.
 		expect( fulfillment.next.bind( fulfillment ) ).toThrow(
 			`The entity being edited (${ entity.kind }, ${ entity.name }) does not have a loaded config.`
@@ -46,8 +60,13 @@ describe( 'deleteEntityRecord', () => {
 		// Trigger generator
 		fulfillment.next();
 
-		// Start
+		// Acquire lock
 		expect( fulfillment.next( entities ).value.type ).toBe(
+			'MOCKED_ACQUIRE_LOCK'
+		);
+
+		// Start
+		expect( fulfillment.next().value.type ).toEqual(
 			'DELETE_ENTITY_RECORD_START'
 		);
 
@@ -62,6 +81,11 @@ describe( 'deleteEntityRecord', () => {
 
 		expect( fulfillment.next().value.type ).toBe(
 			'DELETE_ENTITY_RECORD_FINISH'
+		);
+
+		// Release lock
+		expect( fulfillment.next().value.type ).toEqual(
+			'MOCKED_RELEASE_LOCK'
 		);
 
 		expect( fulfillment.next() ).toMatchObject( {
@@ -80,8 +104,14 @@ describe( 'saveEntityRecord', () => {
 		const fulfillment = saveEntityRecord( 'postType', 'post', post );
 		// Trigger generator
 		fulfillment.next();
-		// Provide entities and trigger apiFetch
+
+		// Provide entities and acquire lock
 		expect( fulfillment.next( entities ).value.type ).toBe(
+			'MOCKED_ACQUIRE_LOCK'
+		);
+
+		// Trigger apiFetch
+		expect( fulfillment.next().value.type ).toEqual(
 			'SAVE_ENTITY_RECORD_START'
 		);
 
@@ -114,6 +144,11 @@ describe( 'saveEntityRecord', () => {
 		expect( fulfillment.next().value.type ).toBe(
 			'SAVE_ENTITY_RECORD_FINISH'
 		);
+		// Release lock
+		expect( fulfillment.next().value.type ).toEqual(
+			'MOCKED_RELEASE_LOCK'
+		);
+
 		expect( fulfillment.next().value ).toBe( updatedRecord );
 	} );
 
@@ -125,8 +160,14 @@ describe( 'saveEntityRecord', () => {
 		const fulfillment = saveEntityRecord( 'postType', 'post', post );
 		// Trigger generator
 		fulfillment.next();
-		// Provide entities and trigger apiFetch
+
+		// Provide entities and acquire lock
 		expect( fulfillment.next( entities ).value.type ).toBe(
+			'MOCKED_ACQUIRE_LOCK'
+		);
+
+		// Trigger apiFetch
+		expect( fulfillment.next().value.type ).toEqual(
 			'SAVE_ENTITY_RECORD_START'
 		);
 		expect( fulfillment.next().value.type ).toBe( '@@data/SELECT' );
@@ -147,6 +188,10 @@ describe( 'saveEntityRecord', () => {
 		expect( fulfillment.next().value.type ).toBe(
 			'SAVE_ENTITY_RECORD_FINISH'
 		);
+		// Release lock
+		expect( fulfillment.next().value.type ).toEqual(
+			'MOCKED_RELEASE_LOCK'
+		);
 	} );
 
 	it( 'triggers a PUT request for an existing record with a custom key', async () => {
@@ -162,8 +207,14 @@ describe( 'saveEntityRecord', () => {
 		const fulfillment = saveEntityRecord( 'root', 'postType', postType );
 		// Trigger generator
 		fulfillment.next();
-		// Provide entities and trigger apiFetch
+
+		// Provide entities and acquire lock
 		expect( fulfillment.next( entities ).value.type ).toBe(
+			'MOCKED_ACQUIRE_LOCK'
+		);
+
+		// Trigger apiFetch
+		expect( fulfillment.next().value.type ).toEqual(
 			'SAVE_ENTITY_RECORD_START'
 		);
 		expect( fulfillment.next().value.type ).toBe( '@@data/SELECT' );
@@ -189,6 +240,10 @@ describe( 'saveEntityRecord', () => {
 		);
 		expect( fulfillment.next().value.type ).toBe(
 			'SAVE_ENTITY_RECORD_FINISH'
+		);
+		// Release lock
+		expect( fulfillment.next().value.type ).toEqual(
+			'MOCKED_RELEASE_LOCK'
 		);
 	} );
 } );
