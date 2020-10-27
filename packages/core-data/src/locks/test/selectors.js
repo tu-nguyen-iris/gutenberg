@@ -26,7 +26,7 @@ describe( 'isLockAvailable', () => {
 		it( 'returns true if lock is available', () => {
 			const state = deepFreeze( {
 				locks: {
-					locks: {
+					tree: {
 						children: {},
 						locks: [],
 					},
@@ -40,7 +40,7 @@ describe( 'isLockAvailable', () => {
 		it( 'returns true if lock is not available', () => {
 			const state = deepFreeze( {
 				locks: {
-					locks: {
+					tree: {
 						children: {},
 						locks: [ { exclusive: false } ],
 					},
@@ -284,14 +284,14 @@ describe( 'isLockAvailable', () => {
 } );
 
 function appendLock( state, path, lock ) {
-	getNode( state.locks.locks, path ).locks.push( lock );
+	getNode( state.locks.tree, path ).locks.push( lock );
 }
 
 function buildState( paths ) {
 	return {
 		locks: {
 			requests: [],
-			locks: paths.reduce(
+			tree: paths.reduce(
 				( tree, path ) => deepCopyLocksTreePath( tree, path ),
 				{
 					locks: [],

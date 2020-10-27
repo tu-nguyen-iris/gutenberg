@@ -5,7 +5,7 @@ import { getNode, deepCopyLocksTreePath } from './utils';
 
 const DEFAULT_STATE = {
 	requests: [],
-	locks: {
+	tree: {
 		locks: [],
 		children: {},
 	},
@@ -32,26 +32,26 @@ export function locks( state = DEFAULT_STATE, action ) {
 			const { lock, request } = action;
 			const { path } = request;
 
-			const newTree = deepCopyLocksTreePath( state.locks, path );
+			const newTree = deepCopyLocksTreePath( state.tree, path );
 			const node = getNode( newTree, path );
 			node.locks = [ ...node.locks, lock ];
 
 			return {
 				...state,
 				requests: state.requests.filter( ( r ) => r !== request ),
-				locks: newTree,
+				tree: newTree,
 			};
 		}
 		case 'RELEASE_LOCK': {
 			const { lock } = action;
 
-			const newTree = deepCopyLocksTreePath( state.locks, lock.path );
+			const newTree = deepCopyLocksTreePath( state.tree, lock.path );
 			const node = getNode( newTree, lock.path );
 			node.locks = node.locks.filter( ( l ) => l !== lock );
 
 			return {
 				...state,
-				locks: newTree,
+				tree: newTree,
 			};
 		}
 	}

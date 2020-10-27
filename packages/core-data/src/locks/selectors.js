@@ -9,7 +9,7 @@ export function getPendingLockRequests( state ) {
 
 export function isLockAvailable( state, store, path, { exclusive } ) {
 	path = [ store, ...path ];
-	const locks = state.locks.locks;
+	const locks = state.locks.tree;
 	let node;
 
 	// Validate all parents and the node itself

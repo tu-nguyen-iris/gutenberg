@@ -40,7 +40,7 @@ describe( 'locks', () => {
 		const request = { path: [ 'bird', 'green' ] };
 		const state = deepFreeze( {
 			requests: [ request ],
-			locks: tree,
+			tree: tree,
 		} );
 
 		const lock = {};
@@ -53,7 +53,7 @@ describe( 'locks', () => {
 		).toEqual( {
 			// Should remove the request...
 			requests: [],
-			locks: {
+			tree: {
 				locks: [],
 				children: {
 					bird: {
@@ -82,7 +82,7 @@ describe( 'locks', () => {
 		const state = deepFreeze( {
 			// Should remove the request...
 			requests: [],
-			locks: {
+			tree: {
 				locks: [],
 				children: {
 					bird: {
@@ -108,7 +108,7 @@ describe( 'locks', () => {
 			} )
 		).toEqual( {
 			requests: [],
-			locks: {
+			tree: {
 				locks: [],
 				children: {
 					bird: {
