@@ -7,18 +7,14 @@ import { v4 as uuid } from 'uuid';
 /**
  * WordPress dependencies
  */
-import {
-	apiFetch,
-	syncSelect,
-	acquireStoreLock,
-	releaseStoreLock,
-} from '@wordpress/data-controls';
+import { apiFetch, syncSelect } from '@wordpress/data-controls';
 import { addQueryArgs } from '@wordpress/url';
 
 /**
  * Internal dependencies
  */
 import { receiveItems, removeItems, receiveQueriedItems } from './queried-data';
+import { acquireStoreLock, releaseStoreLock } from './locks';
 import { getKindEntities, DEFAULT_ENTITY_KEY } from './entities';
 
 /**
@@ -164,7 +160,11 @@ export function* deleteEntityRecord( kind, name, recordId, query ) {
 	if ( ! entity ) {
 		return;
 	}
-	const lock = yield acquireStoreLock( [ kind, name, recordId ], true );
+	const lock = yield acquireStoreLock(
+		'core',
+		[ 'entities', 'data', kind, name, recordId ],
+		{ exclusive: true }
+	);
 	try {
 		yield* doDeleteEntityRecord( entity, recordId, query );
 	} finally {
@@ -350,8 +350,9 @@ export function* saveEntityRecord(
 	const recordId = record[ entityIdKey ];
 
 	const lock = yield acquireStoreLock(
-		[ kind, name, recordId || uuid() ],
-		true
+		'core',
+		[ 'entities', 'data', kind, name, recordId || uuid() ],
+		{ exclusive: true }
 	);
 	try {
 		yield* doSaveEntityRecord( entity, record, recordId, { isAutosave } );

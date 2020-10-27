@@ -74,18 +74,10 @@ export function dispatch( ...args ) {
 	return dataControls.dispatch( ...args );
 }
 
-export const acquireStoreLock = function* ( scope, exclusive = true ) {
+export const awaitPromise = function ( promise ) {
 	return {
-		type: 'ACQUIRE_STORE_LOCK',
-		scope,
-		exclusive,
-	};
-};
-
-export const releaseStoreLock = function* ( lock ) {
-	return {
-		type: 'RELEASE_STORE_LOCK',
-		lock,
+		type: 'AWAIT_PROMISE',
+		promise,
 	};
 };
 
@@ -118,123 +110,10 @@ export const releaseStoreLock = function* ( lock ) {
  * store.
  */
 export const controls = {
-	ACQUIRE_STORE_LOCK: ( { scope, exclusive } ) => {
-		const promise = new Promise( ( resolve ) => {
-			lockRequests.unshift( {
-				exclusive,
-				scope,
-				notifyAcquired: resolve,
-			} );
-		} );
-		acquireAvailableLocks();
-		return promise;
+	AWAIT_PROMISE: async ( { promise } ) => {
+		return await promise;
 	},
-
-	RELEASE_STORE_LOCK: ( { lock } ) => {
-		releaseLock( lock );
-		// Run anything that got unblocked by releasing this lock in the next tick:
-		setTimeout( () => {
-			acquireAvailableLocks();
-		} );
-	},
-
 	API_FETCH( { request } ) {
 		return triggerFetch( request );
 	},
 };
-
-const lockRequests = [];
-const lockTree = {
-	locks: [],
-	children: {},
-};
-
-function acquireAvailableLocks() {
-	for ( let i = lockRequests.length - 1; i >= 0; i-- ) {
-		const { scope, exclusive, notifyAcquired } = lockRequests[ i ];
-		const lock = acquireLock( scope, exclusive );
-		if ( lock ) {
-			// Remove the request from the queue
-			lockRequests.splice( i, 1 );
-
-			// Notify caller
-			notifyAcquired( lock );
-		}
-	}
-}
-
-function acquireLock( path, exclusive ) {
-	if ( ! lockAvailable( path, exclusive ) ) {
-		return false;
-	}
-
-	const node = getNode( path );
-	const lock = { path, exclusive };
-	node.locks.push( lock );
-	return lock;
-}
-
-function releaseLock( lock ) {
-	const node = getNode( lock.path );
-	node.locks.splice( node.locks.indexOf( lock ), 1 );
-}
-
-function lockAvailable( path, exclusive ) {
-	let node;
-
-	// Validate all parents and the node itself
-	for ( node of iteratePath( path ) ) {
-		if ( hasConflictingLock( exclusive, node.locks ) ) {
-			return false;
-		}
-	}
-
-	// Validate all nested nodes
-	for ( const descendant of iterateDescendants( node ) ) {
-		if ( hasConflictingLock( exclusive, descendant.locks ) ) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-function getNode( path ) {
-	const nodes = Array.from( iteratePath( path ) );
-	return nodes.shift();
-}
-
-function* iteratePath( path ) {
-	const currentNode = lockTree;
-	yield currentNode;
-	for ( const branchName of path ) {
-		if ( ! currentNode.children[ branchName ] ) {
-			currentNode.children[ branchName ] = {
-				locks: [],
-				children: {},
-			};
-		}
-		yield currentNode.children[ branchName ];
-	}
-}
-
-function* iterateDescendants( node ) {
-	const stack = [ node ];
-	while ( stack.length ) {
-		const childNode = stack.pop();
-		yield childNode;
-		stack.push( ...Object.values( childNode.children ) );
-	}
-}
-
-function hasConflictingLock( exclusive, locks ) {
-	if ( exclusive && locks.length ) {
-		return true;
-	}
-
-	if ( ! exclusive && locks.filter( ( lock ) => lock.exclusive ).length ) {
-		return true;
-	}
-
-	return false;
-}

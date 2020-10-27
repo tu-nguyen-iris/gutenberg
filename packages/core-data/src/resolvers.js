@@ -8,13 +8,11 @@ import { find, includes, get, hasIn, compact, uniq } from 'lodash';
  */
 import { addQueryArgs } from '@wordpress/url';
 import deprecated from '@wordpress/deprecated';
-import {
-	apiFetch,
-	select,
-	syncSelect,
-	acquireStoreLock,
-	releaseStoreLock,
-} from '@wordpress/data-controls';
+import { apiFetch, select, syncSelect } from '@wordpress/data-controls';
+/**
+ * Internal dependencies
+ */
+import { acquireStoreLock, releaseStoreLock } from './locks/actions';
 
 /**
  * Internal dependencies
@@ -65,7 +63,11 @@ export function* getEntityRecord( kind, name, key = '', query ) {
 	if ( ! entity ) {
 		return;
 	}
-	const lock = yield acquireStoreLock( [ kind, name, key ], false );
+	const lock = yield acquireStoreLock(
+		'core',
+		[ 'entities', 'data', kind, name, key ],
+		{ exclusive: false }
+	);
 	try {
 		if ( query !== undefined && query._fields ) {
 			// If requesting specific fields, items and query assocation to said
@@ -146,7 +148,11 @@ export function* getEntityRecords( kind, name, query = {} ) {
 	if ( ! entity ) {
 		return;
 	}
-	const lock = yield acquireStoreLock( [ kind, name ], false );
+	const lock = yield acquireStoreLock(
+		'core',
+		[ 'entities', 'data', kind, name ],
+		{ exclusive: false }
+	);
 	try {
 		if ( query._fields ) {
 			// If requesting specific fields, items and query assocation to said
