@@ -58,9 +58,37 @@ describe( 'isLockAvailable', () => {
 		beforeEach( () => {
 			state = buildState( [
 				[ 'core', 'entities', 'root', 'template_part', '3' ],
+				[ 'core', 'queries' ],
+				[ 'vendor' ],
 			] );
 		} );
 		it( `returns true if no parent or descendant has any locks`, () => {
+			expect(
+				isLockAvailable(
+					deepFreeze( state ),
+					[ 'core', 'entities', 'root' ],
+					{ exclusive: true }
+				)
+			).toBe( true );
+		} );
+
+		it( `returns true if another branch holds a locks (1/2)`, () => {
+			appendLock( state, [ 'core', 'queries' ], {
+				exclusive: true,
+			} );
+			expect(
+				isLockAvailable(
+					deepFreeze( state ),
+					[ 'core', 'entities', 'root' ],
+					{ exclusive: true }
+				)
+			).toBe( true );
+		} );
+
+		it( `returns true if another branch holds a locks (2/2)`, () => {
+			appendLock( state, [ 'vendor' ], {
+				exclusive: true,
+			} );
 			expect(
 				isLockAvailable(
 					deepFreeze( state ),
@@ -85,7 +113,7 @@ describe( 'isLockAvailable', () => {
 			} );
 
 			it( `returns false if a direct parent already has a lock with exclusive=${ exclusive }`, () => {
-				appendLock( state, [ 'core', 'children' ], {
+				appendLock( state, [ 'core', 'entities' ], {
 					exclusive,
 				} );
 				expect(
@@ -98,7 +126,7 @@ describe( 'isLockAvailable', () => {
 			} );
 
 			it( `returns false if the target node already has a lock with exclusive=${ exclusive }`, () => {
-				appendLock( state, [ 'core', 'children', 'root' ], {
+				appendLock( state, [ 'core', 'entities', 'root' ], {
 					exclusive,
 				} );
 				expect(
@@ -113,7 +141,7 @@ describe( 'isLockAvailable', () => {
 			it( `returns false if a children node already has a lock with exclusive=${ exclusive }`, () => {
 				appendLock(
 					state,
-					[ 'core', 'children', 'root', 'template_part' ],
+					[ 'core', 'entities', 'root', 'template_part' ],
 					{
 						exclusive,
 					}
@@ -130,7 +158,7 @@ describe( 'isLockAvailable', () => {
 			it( `returns false if a grand-children node already has a lock with exclusive=${ exclusive }`, () => {
 				appendLock(
 					state,
-					[ 'core', 'children', 'root', 'template_part', '3' ],
+					[ 'core', 'entities', 'root', 'template_part', '3' ],
 					{
 						exclusive,
 					}
@@ -179,7 +207,7 @@ describe( 'isLockAvailable', () => {
 			} );
 
 			it( `returns ${ expectation } if a direct parent already has a lock with exclusive=${ isOtherLockExclusive }`, () => {
-				appendLock( state, [ 'core', 'children' ], {
+				appendLock( state, [ 'core', 'entities' ], {
 					exclusive: isOtherLockExclusive,
 				} );
 				expect(
@@ -192,7 +220,7 @@ describe( 'isLockAvailable', () => {
 			} );
 
 			it( `returns ${ expectation } if the target node already has a lock with exclusive=${ isOtherLockExclusive }`, () => {
-				appendLock( state, [ 'core', 'children', 'root' ], {
+				appendLock( state, [ 'core', 'entities', 'root' ], {
 					exclusive: isOtherLockExclusive,
 				} );
 				expect(
@@ -207,7 +235,7 @@ describe( 'isLockAvailable', () => {
 			it( `returns ${ expectation } if a children node already has a lock with exclusive=${ isOtherLockExclusive }`, () => {
 				appendLock(
 					state,
-					[ 'core', 'children', 'root', 'template_part' ],
+					[ 'core', 'entities', 'root', 'template_part' ],
 					{
 						exclusive: isOtherLockExclusive,
 					}
@@ -224,7 +252,7 @@ describe( 'isLockAvailable', () => {
 			it( `returns ${ expectation } if a grand-children node already has a lock with exclusive=${ isOtherLockExclusive }`, () => {
 				appendLock(
 					state,
-					[ 'core', 'children', 'root', 'template_part', '3' ],
+					[ 'core', 'entities', 'root', 'template_part', '3' ],
 					{
 						exclusive: isOtherLockExclusive,
 					}
@@ -242,7 +270,7 @@ describe( 'isLockAvailable', () => {
 } );
 
 function appendLock( state, path, lock ) {
-	getNode( path, state.locks.locks ).locks.push( lock );
+	getNode( state.locks.locks, path ).locks.push( lock );
 }
 
 function buildState( paths ) {
