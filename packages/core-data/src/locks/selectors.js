@@ -7,7 +7,8 @@ export function getPendingLockRequests( state ) {
 	return state.locks.requests;
 }
 
-export function isLockAvailable( state, path, { exclusive } ) {
+export function isLockAvailable( state, store, path, { exclusive } ) {
+	path = [ store, ...path ];
 	const locks = state.locks.locks;
 	let node;
 

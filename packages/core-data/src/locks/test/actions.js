@@ -22,6 +22,7 @@ describe( 'enqueueLockRequest', () => {
 		expect( fulfillment.next().value ).toMatchObject( {
 			type: 'ENQUEUE_LOCK_REQUEST',
 			request: {
+				store,
 				path: lockPath,
 				exclusive: true,
 				notifyAcquired: expect.any( Function ),

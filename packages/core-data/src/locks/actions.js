@@ -16,7 +16,7 @@ export function* enqueueLockRequest( store, path, { exclusive } ) {
 	} );
 	yield {
 		type: 'ENQUEUE_LOCK_REQUEST',
-		request: { path: [ store, ...path ], exclusive, notifyAcquired },
+		request: { store, path: [ store, ...path ], exclusive, notifyAcquired },
 	};
 	return promise;
 }
@@ -35,10 +35,16 @@ export function* processPendingLockRequests() {
 	};
 	const lockRequests = yield syncSelect( 'core', 'getPendingLockRequests' );
 	for ( const request of lockRequests ) {
-		const { path, exclusive, notifyAcquired } = request;
-		const isAvailable = yield syncSelect( 'core', 'isLockAvailable', path, {
-			exclusive,
-		} );
+		const { store, path, exclusive, notifyAcquired } = request;
+		const isAvailable = yield syncSelect(
+			'core',
+			'isLockAvailable',
+			store,
+			path,
+			{
+				exclusive,
+			}
+		);
 		if ( isAvailable ) {
 			const lock = { path, exclusive };
 			yield {

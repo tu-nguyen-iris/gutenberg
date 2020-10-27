@@ -33,9 +33,9 @@ describe( 'isLockAvailable', () => {
 				},
 			} );
 
-			expect( isLockAvailable( state, [], { exclusive: true } ) ).toBe(
-				true
-			);
+			expect(
+				isLockAvailable( state, 'core', [], { exclusive: true } )
+			).toBe( true );
 		} );
 		it( 'returns true if lock is not available', () => {
 			const state = deepFreeze( {
@@ -47,9 +47,9 @@ describe( 'isLockAvailable', () => {
 				},
 			} );
 
-			expect( isLockAvailable( state, [], { exclusive: true } ) ).toBe(
-				false
-			);
+			expect(
+				isLockAvailable( state, 'core', [], { exclusive: true } )
+			).toBe( false );
 		} );
 	} );
 
@@ -66,7 +66,8 @@ describe( 'isLockAvailable', () => {
 			expect(
 				isLockAvailable(
 					deepFreeze( state ),
-					[ 'core', 'entities', 'root' ],
+					'core',
+					[ 'entities', 'root' ],
 					{ exclusive: true }
 				)
 			).toBe( true );
@@ -79,7 +80,8 @@ describe( 'isLockAvailable', () => {
 			expect(
 				isLockAvailable(
 					deepFreeze( state ),
-					[ 'core', 'entities', 'root' ],
+					'core',
+					[ 'entities', 'root' ],
 					{ exclusive: true }
 				)
 			).toBe( true );
@@ -92,7 +94,8 @@ describe( 'isLockAvailable', () => {
 			expect(
 				isLockAvailable(
 					deepFreeze( state ),
-					[ 'core', 'entities', 'root' ],
+					'core',
+					[ 'entities', 'root' ],
 					{ exclusive: true }
 				)
 			).toBe( true );
@@ -106,7 +109,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: true }
 					)
 				).toBe( false );
@@ -119,7 +123,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: true }
 					)
 				).toBe( false );
@@ -132,7 +137,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: true }
 					)
 				).toBe( false );
@@ -149,7 +155,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: true }
 					)
 				).toBe( false );
@@ -166,7 +173,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: true }
 					)
 				).toBe( false );
@@ -185,7 +193,8 @@ describe( 'isLockAvailable', () => {
 			expect(
 				isLockAvailable(
 					deepFreeze( state ),
-					[ 'core', 'entities', 'root' ],
+					'core',
+					[ 'entities', 'root' ],
 					{ exclusive: true }
 				)
 			).toBe( true );
@@ -200,7 +209,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: false }
 					)
 				).toBe( expectation );
@@ -213,7 +223,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: false }
 					)
 				).toBe( expectation );
@@ -226,7 +237,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: false }
 					)
 				).toBe( expectation );
@@ -243,7 +255,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: false }
 					)
 				).toBe( expectation );
@@ -260,7 +273,8 @@ describe( 'isLockAvailable', () => {
 				expect(
 					isLockAvailable(
 						deepFreeze( state ),
-						[ 'core', 'entities', 'root' ],
+						'core',
+						[ 'entities', 'root' ],
 						{ exclusive: false }
 					)
 				).toBe( expectation );
